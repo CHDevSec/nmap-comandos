@@ -11,13 +11,14 @@ set -euo pipefail
 
 usage() {
   cat <<EOF
-Uso: $(basename "$0") [-o pasta] [-t 0-5] [-r pacotes/s] [-u [N]] <alvo>
+Uso: $(basename "$0") [-o pasta] [-t 0-5] [-r pacotes/s] [-u] [-U N] <alvo>
 
   <alvo>      IP, domínio ou faixa (ex.: scanme.nmap.org, 10.10.10.5)
   -o pasta    onde salvar (padrão: recon-<alvo>-<data>)
   -t 0-5      velocidade do nmap, -T (padrão: 4)
   -r N        pacotes por segundo mínimos na etapa 1, --min-rate (padrão: nenhum)
-  -u [N]      também varre as top N portas UDP (padrão de N: 20; precisa de sudo)
+  -u          também varre as 20 portas UDP mais comuns (precisa de sudo)
+  -U N        igual ao -u, mas com as N portas UDP mais comuns
   -h          esta ajuda
 
 Com sudo usa SYN scan (-sS, mais rápido); sem sudo, connect scan (-sT).
@@ -26,7 +27,7 @@ O scan UDP (-u) só roda com privilégio (sudo); sem ele, é ignorado com aviso.
 Exemplos:
   $(basename "$0") scanme.nmap.org
   sudo $(basename "$0") -u -r 1000 10.10.10.5
-  sudo $(basename "$0") -u 100 10.10.10.5
+  sudo $(basename "$0") -U 100 10.10.10.5
 EOF
 }
 
@@ -35,16 +36,15 @@ rate=""
 out=""
 udp=0
 udp_top=20
-while getopts ":o:t:r:u:h" opt; do
+while getopts ":o:t:r:uU:h" opt; do
   case $opt in
     o) out=$OPTARG ;;
     t) timing=$OPTARG ;;
     r) rate=$OPTARG ;;
-    u) udp=1; udp_top=$OPTARG ;;
+    u) udp=1 ;;
+    U) udp=1; udp_top=$OPTARG ;;
     h) usage; exit 0 ;;
-    :) # -u sem valor: usa o padrão (20 portas)
-       if [[ $OPTARG == u ]]; then udp=1
-       else echo "erro: -$OPTARG precisa de um valor" >&2; usage >&2; exit 2; fi ;;
+    :) echo "erro: -$OPTARG precisa de um valor" >&2; usage >&2; exit 2 ;;
     *) echo "erro: opção -$OPTARG não existe" >&2; usage >&2; exit 2 ;;
   esac
 done
@@ -59,7 +59,7 @@ target=$1
 command -v nmap >/dev/null || { echo "erro: nmap não instalado (veja o README)" >&2; exit 1; }
 [[ $timing =~ ^[0-5]$ ]] || { echo "erro: -t vai de 0 a 5" >&2; exit 2; }
 [[ -z $rate || $rate =~ ^[0-9]+$ ]] || { echo "erro: -r precisa ser um número" >&2; exit 2; }
-[[ $udp_top =~ ^[0-9]+$ ]] || { echo "erro: -u precisa de um número de portas (ex.: -u 100)" >&2; exit 2; }
+[[ $udp_top =~ ^[0-9]+$ ]] || { echo "erro: -U precisa de um número de portas (ex.: -U 100)" >&2; exit 2; }
 
 if [[ $EUID -eq 0 ]]; then
   scan=-sS
